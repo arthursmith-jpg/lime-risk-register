@@ -2,6 +2,7 @@ import os
 import pandas as pd
 from flask import Flask, render_template, request, Response
 from functools import wraps
+from datetime import date
 
 app = Flask(__name__)
 
@@ -47,3 +48,62 @@ def load_data():
     df["tags"] = df["notes"].apply(tag_notes)
     markets = df.to_dict(orient="records")
     return markets
+
+USERNAME = "admin"
+PASSWORD = "lime2026"
+
+def require_auth(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth = request.authorization
+        if not auth or auth.username != USERNAME or auth.password != PASSWORD:
+            return Response(
+                "Authentication required.",
+                401,
+                {"WWW-Authenticate": 'Basic realm="Lime Risk Register"'}
+            )
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route("/")
+@require_auth
+def index():
+    markets = load_data()
+
+    # Group by country, sort Red-first within each country
+    from collections import defaultdict
+    by_country = defaultdict(list)
+    for m in markets:
+        by_country[m["country"]].append(m)
+
+    # Sort markets within each country: Red first, then Yellow
+    sentiment_order = {"Red": 0, "Yellow": 1}
+    for country in by_country:
+        by_country[country].sort(key=lambda m: sentiment_order.get(m["sentiment"], 2))
+
+    # Sort countries: those with any Red market first, then alpha
+    def country_sort_key(country):
+        has_red = any(m["sentiment"] == "Red" for m in by_country[country])
+        return (0 if has_red else 1, country)
+
+    sorted_countries = sorted(by_country.keys(), key=country_sort_key)
+
+    total = len(markets)
+    red_count = sum(1 for m in markets if m["sentiment"] == "Red")
+    yellow_count = sum(1 for m in markets if m["sentiment"] == "Yellow")
+    countries = sorted(set(m["country"] for m in markets))
+
+    return render_template(
+        "index.html",
+        by_country=by_country,
+        sorted_countries=sorted_countries,
+        total=total,
+        red_count=red_count,
+        yellow_count=yellow_count,
+        countries=countries,
+        now=date.today().strftime("%B %d, %Y"),
+    )
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5006))
+    app.run(host="0.0.0.0", port=port, debug=True)
