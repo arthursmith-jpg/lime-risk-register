@@ -1,4 +1,4 @@
-from app import tag_notes
+from app import tag_notes, load_data
 
 def test_rfp_tag():
     tags = tag_notes("RFP response submitted January 2026")
@@ -52,8 +52,6 @@ def test_empty_notes():
 def test_none_notes():
     tags = tag_notes(None)
     assert tags == []
-
-from app import load_data
 
 def test_load_data_returns_list():
     markets = load_data()
