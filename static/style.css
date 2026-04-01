@@ -201,7 +201,7 @@ main { padding: 24px 32px; max-width: 1400px; margin: 0 auto; }
   margin-right: 2px;
 }
 .red-dot { background: #E53E3E; }
-.yellow-dot { background: #D97706; }
+.yellow-dot { background: #FACC15; }
 
 /* Popup */
 .popup-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }

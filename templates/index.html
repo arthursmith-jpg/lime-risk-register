@@ -142,8 +142,8 @@ function initMap() {
   }).addTo(map);
 
   marketsData.forEach(function(m) {
-    var color = m.sentiment === 'Red' ? '#E53E3E' : '#D97706';
-    var border = m.sentiment === 'Red' ? '#B91C1C' : '#92400E';
+    var color = m.sentiment === 'Red' ? '#E53E3E' : '#FACC15';
+    var border = m.sentiment === 'Red' ? '#B91C1C' : '#CA8A04';
     var circle = L.circleMarker([m.lat, m.lng], {
       radius: 8,
       fillColor: color,
