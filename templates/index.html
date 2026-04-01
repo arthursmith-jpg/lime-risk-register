@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lime Global Risk Register</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">🟢 Lime</div>
+    <div class="header-title">
+      <h1>Global Risk Register</h1>
+      <span class="header-date">{{ now }}</span>
+    </div>
+  </div>
+</header>
+
+<div class="stats-bar">
+  <div class="stat">
+    <span class="stat-number">{{ total }}</span>
+    <span class="stat-label">Markets</span>
+  </div>
+  <div class="stat">
+    <span class="stat-number red-num">{{ red_count }}</span>
+    <span class="stat-label">🔴 Red</span>
+  </div>
+  <div class="stat">
+    <span class="stat-number yellow-num">{{ yellow_count }}</span>
+    <span class="stat-label">🟡 Yellow</span>
+  </div>
+</div>
+
+<div class="filters">
+  <label>Risk Level:
+    <select id="filter-risk" onchange="applyFilters()">
+      <option value="all">All</option>
+      <option value="Red">Red</option>
+      <option value="Yellow">Yellow</option>
+    </select>
+  </label>
+  <label>Country:
+    <select id="filter-country" onchange="applyFilters()">
+      <option value="all">All Countries</option>
+      {% for c in countries %}
+      <option value="{{ c }}">{{ c }}</option>
+      {% endfor %}
+    </select>
+  </label>
+</div>
+
+<main>
+  {% for country in sorted_countries %}
+  <div class="country-section" data-country="{{ country }}">
+    <h2 class="country-heading">{{ country }}</h2>
+    <table class="market-table">
+      <thead>
+        <tr>
+          <th>Market</th>
+          <th>Risk</th>
+          <th>Tags</th>
+          <th>GR Notes</th>
+          <th>GR Lead</th>
+          <th>Regional GR Head</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in by_country[country] %}
+        <tr class="market-row" data-sentiment="{{ m.sentiment }}" data-country="{{ m.country }}">
+          <td class="market-name">{{ m.market }}</td>
+          <td>
+            <span class="badge badge-{{ m.sentiment | lower }}">{{ m.sentiment }}</span>
+          </td>
+          <td class="tags-cell">
+            {% for tag in m.tags %}
+            <span class="tag tag-{{ loop.index0 % 8 }}">{{ tag }}</span>
+            {% endfor %}
+          </td>
+          <td class="notes-cell">
+            {% if m.notes %}
+            <span class="notes-preview">{{ m.notes[:100] }}{% if m.notes|length > 100 %}…{% endif %}</span>
+            {% if m.notes|length > 100 %}
+            <span class="notes-full" style="display:none">{{ m.notes }}</span>
+            <button class="expand-btn" onclick="toggleNote(this)">Show more</button>
+            {% endif %}
+            {% else %}
+            <span class="no-notes">—</span>
+            {% endif %}
+          </td>
+          <td class="person">{{ m.gr_lead }}</td>
+          <td class="person">{{ m.regional_head }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endfor %}
+</main>
+
+<footer>
+  Data source: CSV · Snowflake integration pending
+</footer>
+
+<script>
+function applyFilters() {
+  const risk = document.getElementById('filter-risk').value;
+  const country = document.getElementById('filter-country').value;
+
+  document.querySelectorAll('.country-section').forEach(section => {
+    const sectionCountry = section.dataset.country;
+    let sectionVisible = false;
+
+    section.querySelectorAll('.market-row').forEach(row => {
+      const rowRisk = row.dataset.sentiment;
+      const rowCountry = row.dataset.country;
+      const riskMatch = risk === 'all' || rowRisk === risk;
+      const countryMatch = country === 'all' || rowCountry === country;
+      const show = riskMatch && countryMatch;
+      row.style.display = show ? '' : 'none';
+      if (show) sectionVisible = true;
+    });
+
+    section.style.display = sectionVisible ? '' : 'none';
+  });
+}
+
+function toggleNote(btn) {
+  const cell = btn.parentElement;
+  const preview = cell.querySelector('.notes-preview');
+  const full = cell.querySelector('.notes-full');
+  if (full.style.display === 'none') {
+    preview.style.display = 'none';
+    full.style.display = 'inline';
+    btn.textContent = 'Show less';
+  } else {
+    preview.style.display = 'inline';
+    full.style.display = 'none';
+    btn.textContent = 'Show more';
+  }
+}
+</script>
+
+</body>
+</html>
