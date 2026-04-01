@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lime Global Risk Register</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -33,95 +35,158 @@
   </div>
 </div>
 
-<div class="filters">
-  <label>Risk Level:
-    <select id="filter-risk" onchange="applyFilters()">
-      <option value="all">All</option>
-      <option value="Red">Red</option>
-      <option value="Yellow">Yellow</option>
-    </select>
-  </label>
-  <label>Country:
-    <select id="filter-country" onchange="applyFilters()">
-      <option value="all">All Countries</option>
-      {% for c in countries %}
-      <option value="{{ c }}">{{ c }}</option>
-      {% endfor %}
-    </select>
-  </label>
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('table', this)">Table</button>
+  <button class="tab-btn" onclick="switchTab('map', this)">Map</button>
 </div>
 
-<main>
-  {% for country in sorted_countries %}
-  <div class="country-section" data-country="{{ country }}">
-    <h2 class="country-heading">{{ country }}</h2>
-    <table class="market-table">
-      <thead>
-        <tr>
-          <th>Market</th>
-          <th>Risk</th>
-          <th>Tags</th>
-          <th>GR Notes</th>
-          <th>GR Lead</th>
-          <th>Regional GR Head</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for m in by_country[country] %}
-        <tr class="market-row" data-sentiment="{{ m.sentiment }}" data-country="{{ m.country }}">
-          <td class="market-name">{{ m.market }}</td>
-          <td>
-            <span class="badge badge-{{ m.sentiment | lower }}">{{ m.sentiment }}</span>
-          </td>
-          <td class="tags-cell">
-            {% for tag in m.tags %}
-            <span class="tag tag-{{ loop.index0 % 8 }}">{{ tag }}</span>
-            {% endfor %}
-          </td>
-          <td class="notes-cell">
-            {% if m.notes %}
-            <span class="notes-preview">{{ m.notes[:100] }}{% if m.notes|length > 100 %}…{% endif %}</span>
-            {% if m.notes|length > 100 %}
-            <span class="notes-full" style="display:none">{{ m.notes }}</span>
-            <button class="expand-btn" onclick="toggleNote(this)">Show more</button>
-            {% endif %}
-            {% else %}
-            <span class="no-notes">—</span>
-            {% endif %}
-          </td>
-          <td class="person">{{ m.gr_lead }}</td>
-          <td class="person">{{ m.regional_head }}</td>
-        </tr>
+<!-- TABLE VIEW -->
+<div id="view-table">
+  <div class="filters">
+    <label>Risk Level:
+      <select id="filter-risk" onchange="applyFilters()">
+        <option value="all">All</option>
+        <option value="Red">Red</option>
+        <option value="Yellow">Yellow</option>
+      </select>
+    </label>
+    <label>Country:
+      <select id="filter-country" onchange="applyFilters()">
+        <option value="all">All Countries</option>
+        {% for c in countries %}
+        <option value="{{ c }}">{{ c }}</option>
         {% endfor %}
-      </tbody>
-    </table>
+      </select>
+    </label>
   </div>
-  {% endfor %}
-</main>
+
+  <main>
+    {% for country in sorted_countries %}
+    <div class="country-section" data-country="{{ country }}">
+      <h2 class="country-heading">{{ country }}</h2>
+      <table class="market-table">
+        <thead>
+          <tr>
+            <th>Market</th>
+            <th>Risk</th>
+            <th>Tags</th>
+            <th>GR Notes</th>
+            <th>GR Lead</th>
+            <th>Regional GR Head</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in by_country[country] %}
+          <tr class="market-row" data-sentiment="{{ m.sentiment }}" data-country="{{ m.country }}">
+            <td class="market-name">{{ m.market }}</td>
+            <td>
+              <span class="badge badge-{{ m.sentiment | lower }}">{{ m.sentiment }}</span>
+            </td>
+            <td class="tags-cell">
+              {% for tag in m.tags %}
+              <span class="tag tag-{{ loop.index0 % 8 }}">{{ tag }}</span>
+              {% endfor %}
+            </td>
+            <td class="notes-cell">
+              {% if m.notes %}
+              <span class="notes-preview">{{ m.notes[:100] }}{% if m.notes|length > 100 %}…{% endif %}</span>
+              {% if m.notes|length > 100 %}
+              <span class="notes-full" style="display:none">{{ m.notes }}</span>
+              <button class="expand-btn" onclick="toggleNote(this)">Show more</button>
+              {% endif %}
+              {% else %}
+              <span class="no-notes">—</span>
+              {% endif %}
+            </td>
+            <td class="person">{{ m.gr_lead }}</td>
+            <td class="person">{{ m.regional_head }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+  </main>
+</div>
+
+<!-- MAP VIEW -->
+<div id="view-map" style="display:none">
+  <div class="map-legend">
+    <span class="legend-dot red-dot"></span> High Risk &nbsp;
+    <span class="legend-dot yellow-dot"></span> Moderate Risk
+  </div>
+  <div id="map"></div>
+</div>
 
 <footer>
   Data source: CSV · Snowflake integration pending
 </footer>
 
 <script>
+var marketsData = {{ markets_json | safe }};
+var map = null;
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('view-table').style.display = tab === 'table' ? '' : 'none';
+  document.getElementById('view-map').style.display = tab === 'map' ? '' : 'none';
+  if (tab === 'map' && !map) initMap();
+}
+
+function initMap() {
+  map = L.map('map').setView([30, 10], 2);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap contributors © CARTO',
+    maxZoom: 18
+  }).addTo(map);
+
+  marketsData.forEach(function(m) {
+    var color = m.sentiment === 'Red' ? '#E53E3E' : '#D97706';
+    var border = m.sentiment === 'Red' ? '#B91C1C' : '#92400E';
+    var circle = L.circleMarker([m.lat, m.lng], {
+      radius: 8,
+      fillColor: color,
+      color: border,
+      weight: 1.5,
+      opacity: 1,
+      fillOpacity: 0.85
+    }).addTo(map);
+
+    var tagsHtml = m.tags.length
+      ? m.tags.map(t => '<span class="popup-tag">' + t + '</span>').join(' ')
+      : '<span style="color:#aaa">No tags</span>';
+
+    var notesHtml = m.notes
+      ? '<div class="popup-notes">' + m.notes + (m.notes.length >= 120 ? '…' : '') + '</div>'
+      : '';
+
+    circle.bindPopup(
+      '<div class="popup-header">' +
+        '<strong>' + m.market + '</strong>' +
+        '<span class="popup-badge popup-badge-' + m.sentiment.toLowerCase() + '">' + m.sentiment + '</span>' +
+      '</div>' +
+      '<div class="popup-country">' + m.country + '</div>' +
+      tagsHtml +
+      notesHtml,
+      { maxWidth: 280 }
+    );
+  });
+}
+
 function applyFilters() {
   const risk = document.getElementById('filter-risk').value;
   const country = document.getElementById('filter-country').value;
 
   document.querySelectorAll('.country-section').forEach(section => {
-    const sectionCountry = section.dataset.country;
     let sectionVisible = false;
-
     section.querySelectorAll('.market-row').forEach(row => {
-      const rowRisk = row.dataset.sentiment;
-      const rowCountry = row.dataset.country;
-      const riskMatch = risk === 'all' || rowRisk === risk;
-      const countryMatch = country === 'all' || rowCountry === country;
+      const riskMatch = risk === 'all' || row.dataset.sentiment === risk;
+      const countryMatch = country === 'all' || row.dataset.country === country;
       const show = riskMatch && countryMatch;
       row.style.display = show ? '' : 'none';
       if (show) sectionVisible = true;
     });
-
     section.style.display = sectionVisible ? '' : 'none';
   });
 }
