@@ -52,3 +52,32 @@ def test_empty_notes():
 def test_none_notes():
     tags = tag_notes(None)
     assert tags == []
+
+from app import load_data
+
+def test_load_data_returns_list():
+    markets = load_data()
+    assert isinstance(markets, list)
+    assert len(markets) > 0
+
+def test_load_data_fields():
+    markets = load_data()
+    m = markets[0]
+    assert "market" in m
+    assert "status" in m
+    assert "sentiment" in m
+    assert "notes" in m
+    assert "gr_lead" in m
+    assert "regional_head" in m
+    assert "country" in m
+    assert "tags" in m
+
+def test_load_data_tags_are_lists():
+    markets = load_data()
+    for m in markets:
+        assert isinstance(m["tags"], list)
+
+def test_load_data_red_markets_exist():
+    markets = load_data()
+    red = [m for m in markets if m["sentiment"] == "Red"]
+    assert len(red) > 0
