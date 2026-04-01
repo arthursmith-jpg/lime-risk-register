@@ -258,7 +258,7 @@ Add after the `tag_notes` function:
 DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "Markets.csv")
 
 def load_data():
-    df = pd.read_csv(DATA_FILE)
+    df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
     df.columns = [c.strip() for c in df.columns]
     df = df.rename(columns={
         "Market": "market",
