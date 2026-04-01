@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import csv
 from flask import Flask, render_template, request, Response
 from functools import wraps
 from datetime import date
@@ -28,9 +28,7 @@ def tag_notes(notes):
 DATA_FILE = os.path.join(os.path.dirname(__file__), "data", "Markets.csv")
 
 def load_data():
-    df = pd.read_csv(DATA_FILE, encoding='utf-8-sig')
-    df.columns = [c.strip() for c in df.columns]
-    df = df.rename(columns={
+    col_map = {
         "Market": "market",
         "Market Status": "status",
         "Market Sentiment_GR": "sentiment",
@@ -40,13 +38,15 @@ def load_data():
         "Brand/ Marketing Lead": "brand_lead",
         "Comms Lead": "comms_lead",
         "Country": "country",
-    })
-    df["notes"] = df["notes"].fillna("")
-    df["gr_lead"] = df["gr_lead"].fillna("")
-    df["regional_head"] = df["regional_head"].fillna("")
-    df["country"] = df["country"].fillna("Unknown")
-    df["tags"] = df["notes"].apply(tag_notes)
-    markets = df.to_dict(orient="records")
+    }
+    markets = []
+    with open(DATA_FILE, encoding='utf-8-sig', newline='') as f:
+        for row in csv.DictReader(f):
+            row = {k.strip(): v for k, v in row.items()}
+            m = {col_map.get(k, k): (v or "") for k, v in row.items()}
+            m["country"] = m.get("country") or "Unknown"
+            m["tags"] = tag_notes(m.get("notes", ""))
+            markets.append(m)
     return markets
 
 USERNAME = "admin"
